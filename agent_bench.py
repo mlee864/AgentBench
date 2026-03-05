@@ -7,22 +7,15 @@ import os
 from typing import Dict, Any
 from colorama import Fore, Back, Style
 import wolframalpha
-# 라이브러리 내부의 깐깐한 헤더 체크 로직을 무력화합니다.
 def patched_validate_response(resp):
-    # 원래는 여기서 'text/xml;charset=utf-8'이 아니면 에러를 내지만,
-    # 우리는 그냥 통과시켜 버립니다.
     return True
 
-# 실제 라이브러리 내부 함수를 우리가 만든 가짜 함수로 덮어씌웁니다.
-# (버전에 따라 경로가 다를 수 있어 안전하게 예외처리)
 try:
     import wolframalpha
-    # 이 부분이 핵심입니다. 띄어쓰기 검증을 무시하게 만듭니다.
     wolframalpha.Client._validate_response = staticmethod(lambda resp: None)
     print(f"{Fore.GREEN}✅ WolframAlpha header check patched successfully.{Style.RESET_ALL}")
 except Exception as e:
     print(f"{Fore.YELLOW}⚠️ WolframAlpha patch failed: {e}{Style.RESET_ALL}")
-# --- WolframAlpha 패치 끝 ---
 
 from run_react import main as react_main
 from run_reflexion import main as reflexion_main

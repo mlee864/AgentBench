@@ -109,7 +109,6 @@ def main(args):
                 rollout_tool_s.append(tool_s)
                 rollout_tool_ratio.append(ratio)
 
-                # tool별 누적 (tool_events 기반)
                 metrics = output_dict.get("metrics", {})
                 for ev in metrics.get("tool_events", []):
                     name = ev.get("tool")
@@ -187,7 +186,6 @@ def main(args):
                 rollout_tool_s.append(tool_s)
                 rollout_tool_ratio.append(ratio)
 
-                # tool별 누적 (tool_events 기반)
                 metrics = output_dict.get("metrics", {})
                 for ev in metrics.get("tool_events", []):
                     name = ev.get("tool")
@@ -254,7 +252,6 @@ def main(args):
                 rollout_tool_s.append(tool_s)
                 rollout_tool_ratio.append(ratio)
 
-                # tool별 누적 (tool_events 기반)
                 metrics = output_dict.get("metrics", {})
                 for ev in metrics.get("tool_events", []):
                     name = ev.get("tool")
@@ -330,7 +327,6 @@ def main(args):
                 rollout_tool_s.append(tool_s)
                 rollout_tool_ratio.append(ratio)
 
-                # tool별 누적 (tool_events 기반)
                 metrics = output_dict.get("metrics", {})
                 for ev in metrics.get("tool_events", []):
                     name = ev.get("tool")
