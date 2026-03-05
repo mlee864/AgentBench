@@ -1,7 +1,27 @@
-# src/dataset_loader.py
 import json
 import random
 import os
+
+def parse_answer(text: str):
+    return text.split("Answer: ")[-1]
+
+def get_tools(args):
+    if args.workload == "hotpotqa":
+        from src.tools.hotpotqa_tools.wikipedia import LookupTool, WikipediaTool, FinishTool
+        tools = [WikipediaTool(name="search"), LookupTool(name="lookup"), FinishTool(name="finish")]
+    elif args.workload == "math":
+        from src.tools.math_tools.math_tools import CalculatorTool, WolframAlphaTool, FinishTool
+        tools = [WolframAlphaTool(name="search"), CalculatorTool(name="simplecalc"), FinishTool(name="finish")]
+    elif args.workload == "webshop":
+        from src.tools.webshop_tools.webshop_tools import SearchTool, ClickTool, FinishTool, set_webshop_url
+        set_webshop_url(args.webshop_url)
+        tools = [SearchTool(name="search"), ClickTool(name="click"), FinishTool(name="finish")]
+    elif args.workload == "humaneval":
+        tools = []  # tools will be set in the main function for humaneval
+    else:
+        raise NotImplementedError(f"Not implmented error: {args.workload}")
+    return tools
+
 
 def load_dataset(workload: str, shuffle: bool = False):
     """

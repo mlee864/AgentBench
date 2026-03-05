@@ -1,0 +1,62 @@
+#!/bin/bash
+#SBATCH --job-name=agentbench-vllm
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/%x_%j.out
+#SBATCH --error=logs/%x_%j.err
+
+set -euo pipefail
+
+unset SSL_CERT_FILE
+unset SSL_CERT_DIR
+
+export HF_HOME=/net/projects/notebook/mlee864/hf_cache
+export HF_HUB_CACHE=/net/projects/notebook/mlee864/hf_cache/hub
+export TRANSFORMERS_CACHE=/net/projects/notebook/mlee864/hf_cache/transformers
+export HF_XET_CACHE=/net/projects/notebook/mlee864/hf_cache/xet
+
+# # 1) 환경
+# source ~/.bashrc
+# conda activate via-agentbench
+
+# 2) vLLM 서버 실행 (로컬 바인딩 + 낮은 동시성)
+export OPENAI_API_KEY=""
+export WOLFRAM_ALPHA_APPID=""
+PORT=8001
+
+python -m vllm.entrypoints.openai.api_server \
+  --model Qwen/Qwen2.5-3B-Instruct \
+  --host 127.0.0.1 \
+  --port $PORT \
+  --api-key $OPENAI_API_KEY \
+  --dtype half \
+  --gpu-memory-utilization 0.7 \
+  --max-num-seqs 1 \
+  > vllm_server.log 2>&1 &
+
+
+
+VLLM_PID=$!
+
+# 3) 서버 준비 대기 + 헬스체크
+for i in {1..60}; do
+  if curl -s http://127.0.0.1:$PORT/v1/models -H "Authorization: Bearer $OPENAI_API_KEY" >/dev/null; then
+    echo "vLLM is up."
+    break
+  fi
+  sleep 2
+done
+
+# 4) AgentBench 실행 (HotpotQA 먼저)
+python agent_bench.py --agent react_hotpotqa --config config.yaml > react_hotpotqa.log
+
+# WebShop은 별도 서버 필요하면 여기서 실행 (webshop_url 살아있어야 함)
+# python agent_bench.py --agent react_webshop --config config.yaml
+python agent_bench.py --agent react_math --config config.yaml > react_math.log
+python agent_bench.py --agent react_humaneval --config config.yaml > react_code.log
+
+# 5) 종료
+kill $VLLM_PID

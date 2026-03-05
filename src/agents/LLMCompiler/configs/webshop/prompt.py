@@ -1,4 +1,4 @@
-from src.agents.LLMCompiler.constants import END_OF_PLAN, JOINNER_FINISH
+from src.agents.LLMCompiler.constants import END_OF_PLAN, END_OF_RESPONSE
 
 PLANNER_PROMPT = """You are an intelligent assistant designed to help plan sub-tasks to solve the user's question. 
 
@@ -209,12 +209,12 @@ Thought: Based on the observations, I will select specific options to meet my pr
 ]
 
 
-OUTPUT_PROMPT = """
+OUTPUT_PROMPT = f"""
 Solve a shopping task with interleaving Observation, Thought, and Action steps. Here are some guidelines:
 - You will be given a Question and some observations from a web shop environment.
 - Thought needs to reason about the question based on the Observations in 1-2 sentences.
 - If the Observations are unclear, you must refine the query or navigate the environment until relevant data is found. You MUST NEVER say in your thought that you don't know the answer.
-- You must say <END_OF_RESPONSE> at the end of your response.
+- You must say {END_OF_RESPONSE} at the end of your response.
   
 Action can be one of the following types:
 (1) Finish(answer): Returns the answer and finishes the task. Answer must be concise and specific. Answer MUST NEVER be 'unclear', 'unknown', or similar terms, or you will be PENALIZED.
@@ -223,7 +223,7 @@ Action can be one of the following types:
 ## Your answer should be
 Thought: "your thought"
 Action: "Replan or Finish"
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 Here are some examples:
 """
@@ -241,7 +241,7 @@ Dairy-Free Apple Snack Bars Variety Pack - $21.49
 
 Thought: Based on the observations, the product with item ID B06Y96N1KG matches the criteria as it is dairy-free, apple-flavored, part of a variety pack, and priced at $21.49, which is under $30.
 Action: Replan(Click "B06Y96N1KG" to view product details and proceed with configuration)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 click('B06Y96N1KG')
 Observation:
@@ -254,7 +254,7 @@ Price: $21.49
 
 Thought: I will select the specific options 'Pack of 6' and 'Apple' to match my preferences.
 Action: Replan(Click "Pack of 6" and "Apple" options to configure the product)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 click('Pack of 6')
 click('Apple')
@@ -262,14 +262,14 @@ Observation: You have clicked Pack of 6 and Apple.
 
 Thought: I have finalized the product configuration and need to click 'Buy Now' to complete the purchase.
 Action: Replan(Click 'Buy Now' to finalize the purchase)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 click('Buy Now')
 Observation: Your score (min 0.0, max 1.0): 0.5
 
 Thought: Purchase successful with score 0.5
 Action: Finish(Purchase successful with score 0.5)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 ###
 """,
 """
@@ -283,7 +283,7 @@ No suitable product found.
 
 Thought: I will refine my search to broaden the results.
 Action: Replan(Click "Back to Search" to return to search and search again with broader criteria)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 click('< Back to Search')
 search('vegan snack pack variety')
@@ -308,7 +308,7 @@ Price: $14.99
 
 Thought: I will select the specific options 'Variety Pack' and 'Flavor A' to match my preferences.
 Action: Replan(Click "Variety Pack" and "Flavor A" options to configure the product)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 
 1. click('Variety Pack')
@@ -319,7 +319,7 @@ Observation: Your score (min 0.0, max 1.0): 1.0
 
 Thought: Purchase successful with score 1.0
 Action: Finish(Purchase successful with score 1.0)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 """,
 """
 Question: Find a pair of wireless headphones under $100.
@@ -332,7 +332,7 @@ No suitable product found.
 
 Thought: I will refine my search to broaden the results.
 Action: Replan(Click "Back to Search" to return to search and search again with broader criteria)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 click('< Back to Search')
 search('wireless headphones Bluetooth')
@@ -357,7 +357,7 @@ Price: $99.99
 
 Thought: I will select the specific options 'Standard' and 'Black' to match my preferences.
 Action: Replan(Click "Standard" and "Black" options to configure the product)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 
 1. click('Standard')
 2. click('Black')
@@ -367,6 +367,18 @@ Observation: Your score (min 0.0, max 1.0): 9.0
 
 Thought: Purchase successful with score 9.0
 Action: Finish(Purchase successful with score 9.0)
-<END_OF_RESPONSE>
+{END_OF_RESPONSE}
 """
 ]
+
+def get_planner_prompt(fewshot: int):
+    if fewshot > len(PLANNER_FEWSHOT_LIST):
+        fewshot = len(PLANNER_FEWSHOT_LIST)
+        print(f"Max fewshot examples for webshop planner prompt is {len(PLANNER_FEWSHOT_LIST)}. Running with {fewshot} fewshot examples.")
+    return PLANNER_PROMPT + "\n".join(PLANNER_FEWSHOT_LIST[:fewshot])
+
+def get_output_prompt(fewshot: int):
+    if fewshot > len(OUTPUT_FEWSHOT_LIST):
+        fewshot = len(OUTPUT_FEWSHOT_LIST)
+        print(f"Max fewshot examples for webshop output prompt is {len(OUTPUT_FEWSHOT_LIST)}. Running with {fewshot} fewshot examples.")
+    return OUTPUT_PROMPT + "\n".join(OUTPUT_FEWSHOT_LIST[:fewshot])

@@ -274,3 +274,10 @@ class FinishTool(BaseTool):
 def revert_session(session):
     if "session" in session and session["session"] in webshop_env.sessions:
         webshop_env.sessions[session["session"]] = session
+
+
+def end_condition(observation: str):
+    if "Your score (min 0.0, max 1.0): " in observation:
+        reward = observation.split("Your score (min 0.0, max 1.0): ")[1].split()[0]
+        return True, "Your score (min 0.0, max 1.0): " + reward, float(reward)
+    return False, "", 0.0

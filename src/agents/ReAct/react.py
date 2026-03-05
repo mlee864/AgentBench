@@ -10,6 +10,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.graph.message import add_messages
 from colorama import Fore, Style
 import re
+import time
 
 def extract_thoughts_and_actions(input_str):
     stop_boundary = r"(?:\s*Thought:|\s*Action:|\s*Observation:|\Z)"
@@ -67,12 +68,23 @@ def extract_tool_calls(input_str):
 class AgentState(TypedDict):
     """The state of the agent."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
-
+    metrics: dict
 
 def create_react_agent(
     model: LanguageModelLike,
     tools: Union[Sequence[BaseTool]],
 ) -> CompiledStateGraph:
+    def _ensure_metrics(state: AgentState) -> dict:
+        m = state.get("metrics")
+        if not m:
+            m = {
+                "llm_total_s": 0.0,
+                "tool_total_s": 0.0,
+                "llm_events": [],
+                "tool_events": [],
+                "step": 0,
+            }
+        return m
 
     tool_dict = {}
     for tool in tools:
@@ -80,6 +92,15 @@ def create_react_agent(
     print(f"Registered tools: {list(tool_dict.keys())}")
 
     def execute_tool(state: AgentState) -> AgentState:
+        metrics = state.get("metrics")
+        if not metrics:
+            metrics = {
+                "llm_total_s": 0.0,
+                "tool_total_s": 0.0,
+                "llm_events": [],
+                "tool_events": [],
+                "step": 0,
+            }
         last_message = state["messages"][-1]
         tool_calls = extract_tool_calls(last_message.content)
         if not tool_calls:
@@ -91,38 +112,75 @@ def create_react_agent(
                     print(f"Tool {tool['name']} not found.")
                     continue
                 try:
+                    print("trying to ", tool)
+                    t0 = time.perf_counter()
                     tool_output = tool_dict[tool["name"]].invoke(tool["argument"])
+                    t1 = time.perf_counter()
+                    dt = t1 - t0
+                    print("saving metric")
+                    step_idx = metrics.get("step", 0)
+                    metrics["tool_total_s"] = metrics.get("tool_total_s", 0.0) + dt
+                    metrics.setdefault("tool_events", []).append(
+                        {
+                            "step": step_idx,
+                            "tool": tool["name"],
+                            "argument": tool["argument"],
+                            "start": t0,
+                            "end": t1,
+                            "duration_s": dt,
+                        }
+                    )
+                    metrics["step"] = step_idx + 1
                     if isinstance(tool_output, tuple):
                         tool_output, artifact = tool_output
                     else:
                         artifact = None
-                    print(f"Observation: {tool_output}")
+                    # print(f"Observation: {tool_output}")
                 except Exception as e:
                     tool_output = f"Tool Execution Error: {e}"
+                    print(tool)
                     print(tool_output)
                     messages.append(SystemMessage(content=tool_output, artifact={"done": False}))
-                    return {"messages": messages}
+                    return {"messages": messages, "metrics": metrics}
                 if tool["name"] == "finish":
                     messages.append(SystemMessage(content=tool_output, artifact={"done": True}))
-                    return {"messages": messages}
+                    return {"messages": messages, "metrics": metrics}
                 else:
                     messages.append(SystemMessage(content=f"Action: {tool['name']}[{tool['argument']}]\nObservation: {tool_output}", artifact=artifact))
             if messages:
-                return {"messages": messages}
+                return {"messages": messages, "metrics": metrics}
             else:
                 return {"messages": [HumanMessage(content="Wrong tool call format. Retry to response with \nThought: \nAction: [tool calls]", artifact={"done": False})]}
 
     # Define the function that calls the model
     def call_model(state: AgentState, config: RunnableConfig) -> AgentState:
+        metrics = state.get("metrics")
+        if not metrics:
+            metrics = {
+                "llm_total_s": 0.0,
+                "tool_total_s": 0.0,
+                "llm_events": [],
+                "tool_events": [],
+                "step": 0,
+            }
+        t0 = time.perf_counter()
         response = None
         for chunk in model.stream(state["messages"], config):
             if response:
                 response += chunk
             else:
                 response = chunk
+        t1 = time.perf_counter()
+        dt = t1 - t0
+
+        step_idx = metrics.get("step", 0)
+        metrics["llm_total_s"] = metrics.get("llm_total_s", 0.0) + dt
+        metrics.setdefault("llm_events", []).append(
+            {"step": step_idx, "start": t0, "end": t1, "duration_s": dt}
+        )
         response.content = extract_thoughts_and_actions(response.content)
-        print(response.content)
-        return {"messages": [response]}
+        # print(response.content)
+        return {"messages": [response], "metrics": metrics}
 
     # Define the function that determines whether to continue or not
     def should_continue(state: AgentState) -> Literal["agent", "__end__"]:

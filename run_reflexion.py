@@ -33,14 +33,14 @@ def main(args):
     num_success = 0
     total_score = 0.0
     context_limit = args.context_limit 
-    from src.dataset_loader import load_dataset, get_evaluation_function
+    from src.utils import load_dataset, get_evaluation_function
     print(f"Loading dataset for workload: {args.workload}")
     dataset = load_dataset(args.workload, shuffle=args.shuffle)
     evaluator = get_evaluation_function(args.workload)
     iteration = min(len(dataset), args.samples) if args.samples else len(dataset)
     latencies = []
 
-    def pretty_output(agent: ReflexionAgent, i):
+    def pretty_output(i):
         print(Fore.YELLOW+"=" * 30)
         print(f"Sample {i + 1}/{iteration}")
         if args.workload == "webshop":
@@ -87,14 +87,19 @@ def main(args):
             print(Fore.CYAN+Style.BRIGHT+f"[Sample {i+1}/{iteration}] {query}"+Style.RESET_ALL)
             agent.set_qa(query)
             start = time.time()
-            with trace("Reflexion_trace", tags=[args.workload, args.model, "Iteration_limit:"+str(args.iteration_limit), "Reflection_limit:"+str(args.reflection_limit)]):
+            with trace("Reflexion_trace", 
+                       tags=[args.workload, 
+                             args.model, 
+                             "Iteration_limit:"+str(args.iteration_limit), 
+                             "Reflection_limit:"+str(args.reflection_limit),
+                             "Index:"+str(i)]):
                 _, ispass = run_agent(agent, args.workload, query=query, max_reflextions=args.reflection_limit, reset_func=None, label=answer) # query is just for tracing.
             end = time.time()
             latencies.append(end - start)
             print(f"Latency: {round(end - start, 2)} sec\n")
             if ispass:
                 num_success += 1
-            pretty_output(agent, i)
+            pretty_output(i)
 
     elif args.workload == "math":
         from src.tools.math_tools.math_equivalence import extract_boxed_value
@@ -112,7 +117,7 @@ def main(args):
             print(f"Latency: {round(end - start, 2)} sec\n")
             if ispass:
                 num_success += 1
-            pretty_output(agent, i)
+            pretty_output(i)
         
     elif args.workload == "webshop":
         from src.tools.webshop_tools.webshop_tools import ResetTool
@@ -132,7 +137,7 @@ def main(args):
             total_score += float(score)
             if ispass:
                 num_success += 1
-            pretty_output(agent, i)
+            pretty_output(i)
 
     elif args.workload == "humaneval":
         from src.tools.humaneval_tools.coding_tools import GeneratorTool, ExecutorTool, FinishTool
@@ -162,7 +167,7 @@ def main(args):
             latencies.append(end - start)
             if ispass:
                 num_success += 1
-            pretty_output(agent, i)
+            pretty_output(i)
     else:
         NotImplementedError(f"Not implemented error: {args.workload}")
     return
